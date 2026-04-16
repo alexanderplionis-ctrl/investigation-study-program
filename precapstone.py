@@ -86,41 +86,48 @@ print(user_stats[["user_id", "total_queries", "midnight_pct",
                     "anomaly_score", ascending=False))
 
 # -- Tool 3: NetworkX --
-print("\n--- NetworkX Graph Analysis ---")
+print("\n--- NetworkX Graph Analysis (Simulated) ---")
 
-# Build a network based on shared IP addresses
-# First get IP address data per user
-ip_query = """
-    SELECT user_id, ip_address, COUNT(*) AS shared_count
-    FROM capstone_logs
-    GROUP BY user_id, ip_address
-    HAVING COUNT(*) > 1
-"""
-ip_data = pd.read_sql(ip_query, engine)
-print(f"User-IP combinations: {len(ip_data)}")
+# Create simulated shared infrastructure data
+shared_ip_data = pd.DataFrame({
+    "user_id": ["USR_001", "USR_003", "USR_001", "USR_005", 
+                "USR_007", "USR_009", "USR_002", "USR_002",
+                "USR_006", "USR_008"],
+    "ip_address": ["10.0.0.1", "10.0.0.1", "10.0.0.2", "10.0.0.2",
+                   "10.0.0.3", "10.0.0.3", "10.0.0.4", "10.0.0.5",
+                   "10.0.0.5", "10.0.0.6"]
+})
 
-# Build graph -- connect users who share IP addresses
+print("Simulated shared IP connections:")
+print(shared_ip_data)
+
+# Build graph
 G = nx.Graph()
 
-# Add edges between users sharing the same IP
-for ip in ip_data["ip_address"].unique():
-    users_sharing_ip = ip_data[ip_data["ip_address"] == ip]["user_id"].tolist()
+for ip in shared_ip_data["ip_address"].unique():
+    users_sharing_ip = shared_ip_data[
+        shared_ip_data["ip_address"] == ip]["user_id"].tolist()
     for i in range(len(users_sharing_ip)):
         for j in range(i + 1, len(users_sharing_ip)):
-            G.add_edge(users_sharing_ip[i], users_sharing_ip[j],
-                       ip=ip)
+            G.add_edge(users_sharing_ip[i], users_sharing_ip[j], ip=ip)
 
-print(f"Graph nodes: {G.number_of_nodes()}")
+print(f"\nGraph nodes: {G.number_of_nodes()}")
 print(f"Graph edges: {G.number_of_edges()}")
 
 # Find connected components
 components = list(nx.connected_components(G))
-print(f"\nConnected compoenents: {len(components)}")
+print(f"\nConnected components: {len(components)}")
 for i, component in enumerate(components):
-    print(f"   Component {i+1}: {component} ({len(component)} accounts)")
+    print(f"  Component {i+1}: {component} ({len(component)} accounts)")
 
-# Calculate degree centrality
+# Flag large components
+print("\nLarge clusters (more than 2 accounts):")
+for component in components:
+    if len(component) > 2:
+        print(f"  FLAGGED cluster: {component}")
+
+# Degree centrality
 print("\nAccount connectivity (degree):")
 degrees = sorted(G.degree(), key=lambda x: x[1], reverse=True)
 for user, degree in degrees[:5]:
-    print(f"   {user}: connected to {degree} other accounts")
+    print(f"  {user}: connected to {degree} other accounts")
