@@ -1,0 +1,6 @@
+user_id,timestamp,query_text,response_length,ip_address,country,flagged,hour,long_response
+USR_003,2024-06-15 02:15:00,How do I synthesize compound X,2840,192.168.1.1,Unknown,False,2,True
+USR_003,2024-06-15 02:16:30,Precursor chemicals for Y,3100,192.168.1.1,Unknown,False,2,True
+USR_001,2024-06-15 09:30:00,What is the weather today,450,72.21.91.1,US,False,9,False
+USR_007,2024-06-15 02:17:45,Dispersal methods for Z,4200,10.0.0.1,Unknown,False,2,True
+USR_007,2024-06-15 02:19:00,Stabilization of compound X,3800,10.0.0.1,Unknown,False,2,True

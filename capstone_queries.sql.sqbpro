@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><sqlb_project><db path="investigation.db" readonly="0" foreign_keys="1" case_sensitive_like="0" temp_store="0" wal_autocheckpoint="1000" synchronous="2"/><attached/><window><main_tabs open="structure browser pragmas query" current="3"/></window><tab_structure><column_width id="0" width="300"/><column_width id="1" width="0"/><column_width id="2" width="100"/><column_width id="3" width="898"/><column_width id="4" width="0"/><expanded_item id="0" parent="1"/><expanded_item id="1" parent="1"/><expanded_item id="2" parent="1"/><expanded_item id="3" parent="1"/></tab_structure><tab_browse><table title="capstone_logs" custom_title="0" dock_id="2" table="4,13:maincapstone_logs"/><dock_state state="000000ff00000000fd00000001000000020000000000000000fc0100000002fb000000160064006f0063006b00420072006f00770073006500310100000000ffffffff0000000000000000fb000000160064006f0063006b00420072006f00770073006500320100000000ffffffff0000011e00ffffff000000000000000000000004000000040000000800000008fc00000000"/><default_encoding codec=""/><browse_table_settings/></tab_browse><tab_sql><sql name="SQL 1*">-- Window Function basics
+SELECT user_id,
+		Timestamp,
+		response_length,
+		AVG(response_length) OVER (PARTITION BY user_id) AS user_avg_response
+FROM capstone_logs
+ORDER BY user_id
+
+-- Window Function with deviation
+SELECT user_id
+	timestamp,
+	response_length,
+	ROUND(AVG(response_length) OVER (PARTITION BY user_id), 0) AS user_avg,
+	response_length - ROUND(AVG(response_length) OVER (PARTITION BY user_id), 0) AS deviation
+FROM capstone_logs
+ORDER BY deviation DESC
+LIMIT 20;
+
+-- ROW_NUMBER and RANK
+SELECT user_id,
+	response_length,
+	row_number() OVER (PARTITION BY user_id
+									ORDER BY response_length DESC) AS response_rank
+FROM capstone_logs
+ORDER BY user_id, response_rank
+LIMIT 20;
+
+--Get the single longest response query per user
+SELECT user_id, timestamp, query_text, response_length
+FROM (
+	SELECT user_id, timestamp, query_text, response_length,
+		row_number() OVER (PARTITION BY user_id
+							ORDER BY response_length DESC) AS response_rank
+	FROM capstone_logs
+)
+WHERE response_rank = 1
+ORDER BY response_length DESC;
+
+--LAG and LEAD -- looking at adjacent rows
+SELECT user_id,
+	timestamp,
+	query_text,
+	LAG(timestamp) OVER (PARTITION BY user_id
+						ORDER BY timestamp) AS previous_query_time,
+	ROUND((JULIANDAY(timestamp) - julianday(LAG(timestamp) OVER (PARTITION BY user_id
+						ORDER BY timestamp))) * 86400, 0) AS seconds_since_last
+FROM capstone_logs
+ORDER BY user_id, timestamp
+LIMIT 20;
+
+-- CTE example -- rewriting the subquery as a CTE
+WITH ranked_queries AS (
+	SELECT user_id,
+	timestamp,
+	query_text,
+	response_length,
+	row_number() OVER (PARTITION BY user_id
+						ORDER BY response_length DESC) AS response_rank
+	FROM capstone_logs
+)
+SELECT user_id, timestamp, query_text, response_length
+FROM ranked_queries
+WHERE response_rank = 1
+ORDER BY response_length DESC;
+
+--Multiple CTEs -- building an investigation pipeline in SQL
+WITH
+
+-- STEP 1: Calculate user statistics
+user_stats AS (
+	SELECT user_id,
+	COUNT(*) AS total_queries,
+	ROUND(AVG(response_length), 0) AS avg_response,
+	MAX(response_length) AS max_response,
+	SUM(CASE WHEN strftime('%H', timestamp) BETWEEN '00' and '03'
+		THEN 1 ELSE 0 END) AS midnight_queries
+	FROM capstone_logs
+	GROUP BY user_id
+),
+
+-- STEP 2: Rank users by suspicion
+ranked_users AS (
+	SELECT user_id,
+		total_queries,
+		avg_response,
+		max_response,
+		midnight_queries,
+		ROUND(midnight_queries * 100.0 / total_queries, 1) AS midnight_pct
+	FROM user_stats
+)
+
+-- Final Output
+SELECT user_id,
+	total_queries,
+	avg_response,
+	max_response,
+	midnight_queries,
+	midnight_pct
+FROM ranked_users
+ORDER BY midnight_pct DESC, total_queries DESC;</sql><current_tab id="0"/></tab_sql></sqlb_project>

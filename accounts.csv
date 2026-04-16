@@ -1,0 +1,8 @@
+user_id,query_count,cbrn_hits,account_age_days,country
+USR_001,847,12,45,US
+USR_002,23,0,365,UK
+USR_003,1350,45,7,Unknown
+USR_004,4,0,180,CA
+USR_005,389,8,30,DE
+USR_006,23,0,90,US
+USR_007,2750,120,3,Unknown

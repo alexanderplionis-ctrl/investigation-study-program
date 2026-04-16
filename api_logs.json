@@ -1,0 +1,57 @@
+[
+    {
+        "user_id": "USR_003",
+        "timestamp": "2024-06-15 02:15:00",
+        "query_text": "How do I synthesize compound X",
+        "response_length": 2840,
+        "metadata": {
+            "ip_address": "192.168.1.1",
+            "country": "Unknown",
+            "flagged": false
+        }
+    },
+    {
+        "user_id": "USR_003",
+        "timestamp": "2024-06-15 02:16:30",
+        "query_text": "Precursor chemicals for Y",
+        "response_length": 3100,
+        "metadata": {
+            "ip_address": "192.168.1.1",
+            "country": "Unknown",
+            "flagged": false
+        }
+    },
+    {
+        "user_id": "USR_001",
+        "timestamp": "2024-06-15 09:30:00",
+        "query_text": "What is the weather today",
+        "response_length": 450,
+        "metadata": {
+            "ip_address": "72.21.91.1",
+            "country": "US",
+            "flagged": false
+        }
+    },
+    {
+        "user_id": "USR_007",
+        "timestamp": "2024-06-15 02:17:45",
+        "query_text": "Dispersal methods for Z",
+        "response_length": 4200,
+        "metadata": {
+            "ip_address": "10.0.0.1",
+            "country": "Unknown",
+            "flagged": false
+        }
+    },
+    {
+        "user_id": "USR_007",
+        "timestamp": "2024-06-15 02:19:00",
+        "query_text": "Stabilization of compound X",
+        "response_length": 3800,
+        "metadata": {
+            "ip_address": "10.0.0.1",
+            "country": "Unknown",
+            "flagged": false
+        }
+    }
+]

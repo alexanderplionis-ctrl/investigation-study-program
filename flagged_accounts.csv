@@ -1,0 +1,5 @@
+user_id,query_count,cbrn_hits,account_age_days,country,velocity,cbrn_ratio,risk_score,flagged
+USR_007,2750,120,3,Unknown,916.67,0.0436,369.28,True
+USR_003,1350,45,7,Unknown,192.86,0.0333,79.14,True
+USR_001,847,12,45,US,18.82,0.0142,8.38,True
+USR_005,389,8,30,DE,12.97,0.0206,6.42,True
