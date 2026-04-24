@@ -1,9 +1,10 @@
 # =============================================================
 # INVESTIGATION STUDY PROGRAM -- REFERENCE CHEATSHEET
 # Covers: SQL patterns, Python, pandas, ML, NetworkX
+# Last updated: Month 2 complete
 # =============================================================
 
-# ---- IMPORTS ------------------------------------------------
+# ── IMPORTS ──────────────────────────────────────────────────
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,7 +17,165 @@ import json
 import re
 import csv
 
-# ---- SQLALCHEMY DATABASE CONNECTION -------------------------
+# =============================================================
+# SECTION 1: SQL REFERENCE
+# =============================================================
+
+# ── CLAUSE ORDER (mnemonic: Silly Frogs Wear Green Hats Outdoors)
+# SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY
+
+# ── AGGREGATE FUNCTIONS ──────────────────────────────────────
+# COUNT(*)                    -- count all rows
+# COUNT(col)                  -- count non-null values
+# COUNT(DISTINCT col)         -- count unique values
+# SUM(col)                    -- sum of values
+# AVG(col)                    -- average of values
+# MAX(col)                    -- highest value
+# MIN(col)                    -- lowest value
+# ROUND(AVG(col), 1)          -- rounded to 1 decimal place
+#
+# AVG vs MAX -- know which one the question asks for:
+# AVG(col) -- average across all rows in group
+# MAX(col) -- single highest value in group
+# Both can be used in HAVING and aliased in ORDER BY
+
+# ── GROUP BY PATTERN ─────────────────────────────────────────
+# SELECT col, COUNT(*) AS total
+# FROM table
+# GROUP BY col
+# HAVING total > 100          -- filter on aggregated value
+# ORDER BY total DESC
+
+# ── WINDOW FUNCTIONS ─────────────────────────────────────────
+# ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY timestamp DESC) AS rn
+# RANK()       OVER (PARTITION BY user_id ORDER BY score DESC) AS rnk
+# LAG(col)     OVER (PARTITION BY user_id ORDER BY timestamp) AS prev_val
+# LEAD(col)    OVER (PARTITION BY user_id ORDER BY timestamp) AS next_val
+# AVG(col)     OVER (PARTITION BY user_id) AS user_avg
+#
+# ORDER BY col DESC inside OVER --> rn=1 is HIGHEST value
+# ORDER BY col ASC  inside OVER --> rn=1 is LOWEST value
+
+# ── GET ONE ROW PER GROUP ────────────────────────────────────
+# (most recent, highest, lowest -- use ROW_NUMBER)
+#
+# WITH ranked AS (
+#     SELECT *, ROW_NUMBER() OVER (PARTITION BY user_id
+#                                  ORDER BY timestamp DESC) AS rn
+#     FROM table
+# )
+# SELECT * FROM ranked WHERE rn = 1;
+#
+# WHERE and ORDER BY always go in the OUTER SELECT, never inside CTE
+
+# ── CTE PATTERNS ─────────────────────────────────────────────
+# Single CTE:
+# WITH cte_name AS (
+#     SELECT ...
+# )
+# SELECT * FROM cte_name;
+#
+# Chained CTEs:
+# WITH
+# step1 AS (SELECT ...),
+# step2 AS (SELECT ... FROM step1)
+# SELECT * FROM step2;
+#
+# Recursive CTE:
+# WITH RECURSIVE cte AS (
+#     SELECT ...           -- anchor query (runs once)
+#     UNION ALL
+#     SELECT ... FROM cte  -- recursive step
+#     WHERE depth < 5      -- stopping condition
+# )
+
+# ── DATETIME WITH STRFTIME (SQLite) ──────────────────────────
+# STRFTIME('%H', timestamp)        -- hour as '00' to '23'
+# STRFTIME('%Y-%m-%d', timestamp)  -- date as '2024-03-30'
+# STRFTIME('%w', timestamp)        -- day of week 0=Sunday 6=Saturday
+# STRFTIME('%m', timestamp)        -- month as '01' to '12'
+#
+# Nighttime filter (midnight to 3am):
+# WHERE STRFTIME('%H', timestamp) BETWEEN '00' AND '03'
+#
+# Count distinct active days per user:
+# COUNT(DISTINCT STRFTIME('%Y-%m-%d', timestamp)) AS active_days
+#
+# Count midnight queries per user:
+# SUM(CASE WHEN STRFTIME('%H', timestamp) BETWEEN '00' AND '03'
+#          THEN 1 ELSE 0 END) AS midnight_queries
+
+# ── CASE WHEN PATTERNS ───────────────────────────────────────
+# Simple classification:
+# CASE WHEN col = 'value' THEN 'label'
+#      WHEN col > 100     THEN 'high'
+#      ELSE 'other'
+# END AS category
+#
+# Conditional count (pivot table pattern):
+# SUM(CASE WHEN category = 'Chemical' THEN 1 ELSE 0 END) AS chemical
+
+# ── PIVOT TABLE PATTERN ──────────────────────────────────────
+# SELECT user_id,
+#        SUM(CASE WHEN cat = 'Chemical'   THEN 1 ELSE 0 END) AS chemical,
+#        SUM(CASE WHEN cat = 'Biological' THEN 1 ELSE 0 END) AS biological,
+#        COUNT(*) AS total
+# FROM classified
+# GROUP BY user_id
+# ORDER BY (chemical + biological) DESC;
+
+# ── JOIN PATTERNS ────────────────────────────────────────────
+# INNER JOIN -- only matching rows:
+# SELECT * FROM a JOIN b ON a.id = b.id
+#
+# LEFT JOIN -- all rows from left table:
+# SELECT * FROM a LEFT JOIN b ON a.id = b.id
+#
+# Self join -- compare rows within same table:
+# SELECT a.user_id, b.user_id
+# FROM table a JOIN table b ON a.ip = b.ip
+# WHERE a.user_id != b.user_id
+
+# ── SUBQUERY PATTERNS ────────────────────────────────────────
+# Filter using subquery result:
+# WHERE col IN (SELECT col FROM table WHERE condition)
+#
+# Get row matching max value per group:
+# WHERE (user_id, timestamp) IN (
+#     SELECT user_id, MAX(timestamp)
+#     FROM table GROUP BY user_id
+# )
+
+# ── STRING FUNCTIONS ─────────────────────────────────────────
+# LOWER(col)                    -- convert to lowercase
+# LENGTH(col)                   -- character count
+# INSTR(LOWER(col), 'keyword')  -- find position, 0 if not found
+# SUBSTR(col, start, length)    -- extract substring
+# REPLACE(col, 'old', 'new')    -- replace text
+#
+# CBRN keyword detection:
+# INSTR(LOWER(query_text), 'synthesize') > 0
+
+# ── TEMPORAL SQL ─────────────────────────────────────────────
+# Time between consecutive queries in seconds:
+# ROUND((JULIANDAY(timestamp) -
+#        JULIANDAY(LAG(timestamp) OVER (PARTITION BY user_id
+#                                       ORDER BY timestamp))) * 86400, 0)
+#        AS seconds_since_last
+
+# ── PERFORMANCE ──────────────────────────────────────────────
+# Create index for faster queries on large tables:
+# CREATE INDEX IF NOT EXISTS idx_country ON table(country);
+#
+# Check query execution plan:
+# EXPLAIN QUERY PLAN SELECT ...;
+# SCAN = slow (reads every row)
+# SEARCH USING INDEX = fast (jumps to matching rows)
+
+# =============================================================
+# SECTION 2: SQLALCHEMY DATABASE CONNECTION
+# =============================================================
+
 engine = create_engine("sqlite:///database.db")
 
 # Run SQL query and return DataFrame
@@ -29,13 +188,19 @@ df = pd.read_sql(
     params={"uid": "USR_001"}
 )
 
-# ---- PANDAS BASICS ------------------------------------------
+# =============================================================
+# SECTION 3: PANDAS
+# =============================================================
 
-# Load data
+# ── LOADING DATA ─────────────────────────────────────────────
 df = pd.read_csv("file.csv")
 df = pd.read_csv("file.csv", encoding="latin-1")  # if UTF-8 fails
 
-# Basic exploration -- always do these first
+# Display settings
+pd.set_option("display.max_columns", None)
+pd.set_option("display.width", None)
+
+# ── BASIC EXPLORATION (always do these first) ────────────────
 df.shape                    # (rows, columns)
 df.columns.tolist()         # list of column names
 df.head()                   # first 5 rows
@@ -45,45 +210,33 @@ df.isnull().sum()           # count missing values per column
 df["col"].nunique()         # count unique values
 df["col"].value_counts()    # count occurrences of each value
 
-# Display settings
-pd.set_option("display.max_columns", None)
-pd.set_option("display.width", None)
-
-# ---- PANDAS FILTERING ---------------------------------------
-
-# Single condition
+# ── FILTERING ────────────────────────────────────────────────
 df[df["column"] > value]
 df[df["column"] == "text"]
-df[df["column"].isna()]         # find NULL/NaN rows
-df[df["column"].notna()]        # find non-NULL rows
+df[df["column"].isna()]                          # find NULL/NaN rows
+df[df["column"].notna()]                         # find non-NULL rows
+df[(df["col1"] > val1) & (df["col2"] == val2)]  # AND
+df[(df["col1"] > val1) | (df["col2"] == val2)]  # OR
+df[df["col"].isin(["val1", "val2"])]             # equivalent to SQL IN
+df[df["col"].between(low, high)]                 # equivalent to BETWEEN
+df[df["col"].str.contains("keyword", case=False)] # string search
 
-# Multiple conditions -- use & for AND, | for OR
-df[(df["col1"] > val1) & (df["col2"] == val2)]
-df[(df["col1"] > val1) | (df["col2"] == val2)]
-
-# List membership -- equivalent to SQL IN
-df[df["col"].isin(["val1", "val2", "val3"])]
-
-# Range -- equivalent to SQL BETWEEN
-df[df["col"].between(low, high)]
-
-# String contains
-df[df["col"].str.contains("keyword", case=False)]
-
-# ---- PANDAS COLUMN OPERATIONS -------------------------------
-
-# Add calculated column
-df["new_col"] = df["col1"] / df["col2"]
+# ── COLUMN OPERATIONS ────────────────────────────────────────
+df["new_col"] = df["col1"] / df["col2"]          # calculated column
+df["col"] = df["col"].round(2)                    # round
+df["col"] = df["col"].astype(int)                 # type conversion
+df["col"] = df["col"].fillna(0)                   # fill NaN with 0
+df["col"] = df["col"].replace("old", "new")       # replace values
 
 # Conditional column -- equivalent to SQL CASE WHEN
 df["tier"] = np.where(df["score"] > 6, "High", "Low")
 
-# Multi-condition with apply and lambda
+# Multi-condition with lambda
 df["tier"] = df["score"].apply(
     lambda x: "Critical" if x > 9 else "High" if x > 6 else "Low"
 )
 
-# Apply a custom function to a column
+# Apply custom function to column
 def classify(text):
     if "synthesize" in text.lower():
         return "Chemical"
@@ -91,26 +244,12 @@ def classify(text):
 
 df["category"] = df["query_text"].apply(classify)
 
-# Round numeric column
-df["col"] = df["col"].round(2)
-
-# Type conversion
-df["col"] = df["col"].astype(int)
-df["col"] = df["col"].astype(str)
-
-# Replace values
-df["col"] = df["col"].fillna(0)          # fill NaN with 0
-df["col"] = df["col"].replace("old", "new")
-
-# ---- PANDAS SORTING AND RANKING -----------------------------
-
+# ── SORTING AND RANKING ──────────────────────────────────────
 df.sort_values("column", ascending=False)
 df.sort_values(["col1", "col2"], ascending=[False, True])
-df.reset_index(drop=True)   # reset index after sorting
+df.reset_index(drop=True)                         # reset after sorting
 
-# ---- PANDAS GROUPBY AND AGGREGATION -------------------------
-
-# Basic groupby
+# ── GROUPBY AND AGGREGATION ──────────────────────────────────
 df.groupby("column").mean()
 df.groupby("column").agg({"col1": "sum", "col2": "mean"})
 
@@ -123,58 +262,34 @@ result = df.groupby("user_id").agg(
     unknown_country=("country", lambda x: (x == "Unknown").sum())
 ).reset_index()
 
-# ---- PANDAS MERGE (equivalent to SQL JOIN) ------------------
+# ── MERGE (equivalent to SQL JOIN) ───────────────────────────
+merged = df1.merge(df2, on="user_id", how="inner")   # inner join
+merged = df1.merge(df2, on="user_id", how="left")    # left join
+merged = df1.merge(df2, left_on="user_id", right_on="id")  # different col names
 
-# Inner join -- only matching rows
-merged = df1.merge(df2, on="user_id", how="inner")
-
-# Left join -- all rows from left, NaN for unmatched right
-merged = df1.merge(df2, on="user_id", how="left")
-
-# Join on different column names
-merged = df1.merge(df2, left_on="user_id", right_on="id")
-
-# ---- DATETIME -----------------------------------------------
-
-from datetime import datetime, timedelta
-
-# Current time
+# ── DATETIME ─────────────────────────────────────────────────
 now = datetime.now()
-
-# Convert string column to datetime
 df["timestamp"] = pd.to_datetime(df["timestamp"])
-
-# Extract components
 df["hour"] = df["timestamp"].dt.hour
-df["day_of_week"] = df["timestamp"].dt.dayofweek  # 0=Monday
+df["day_of_week"] = df["timestamp"].dt.dayofweek   # 0=Monday
 df["day_name"] = df["timestamp"].dt.day_name()
 df["month"] = df["timestamp"].dt.month
 df["date"] = df["timestamp"].dt.date
-
-# Boolean flags
 df["is_nighttime"] = df["hour"].between(0, 4)
 df["is_weekend"] = df["day_of_week"].isin([5, 6])
-
-# Time arithmetic
 one_week_ago = now - timedelta(days=7)
+now.strftime("%Y-%m-%d %H:%M")                     # format as string
 
-# Format datetime as string
-now.strftime("%Y-%m-%d %H:%M")
-
-# ---- PANDAS OUTPUT ------------------------------------------
-
-# Save to CSV
+# ── OUTPUT ───────────────────────────────────────────────────
 df.to_csv("output.csv", index=False)
-
-# Save to Excel with multiple sheets
-from openpyxl.styles import PatternFill, Font
-import openpyxl
 
 with pd.ExcelWriter("report.xlsx", engine="openpyxl") as writer:
     df.to_excel(writer, sheet_name="Data", index=False)
     df2.to_excel(writer, sheet_name="Summary", index=False)
 
-# ---- MATPLOTLIB VISUALIZATION -------------------------------
+# =============================================================
+# SECTION 4: MATPLOTLIB VISUALIZATION
+# =============================================================
 
 # Basic bar chart
 plt.figure(figsize=(10, 6))
@@ -187,41 +302,34 @@ plt.tight_layout()
 plt.savefig("chart.png", dpi=150)
 plt.show()
 
-# Horizontal bar chart
-plt.barh(df["user_id"], df["score"])
+plt.barh(df["user_id"], df["score"])               # horizontal bar
+plt.axhline(y=6.0, color="orange", linestyle="--", label="Threshold")
+plt.legend()
+plt.scatter(df["x"], df["y"], c=colors, s=100)     # scatter plot
+plt.close()                                         # close without showing
 
 # Color coded bars
 colors = ["red" if v > 6 else "steelblue" for v in df["score"]]
 plt.bar(df["user_id"], df["score"], color=colors)
 
-# Threshold line
-plt.axhline(y=6.0, color="orange", linestyle="--", label="Threshold")
-plt.legend()
-
-# Scatter plot
-plt.scatter(df["x"], df["y"], c=colors, s=100)
-
 # Multiple subplots
 fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-axes[0, 0].bar(...)   # top left
-axes[0, 1].bar(...)   # top right
+axes[0, 0].bar(...)     # top left
+axes[0, 1].bar(...)     # top right
 axes[1, 0].scatter(...) # bottom left
-axes[1, 1].pie(...)   # bottom right
+axes[1, 1].pie(...)     # bottom right
 plt.tight_layout()
 
-# Close without showing (for automated pipelines)
-plt.close()
+# =============================================================
+# SECTION 5: JSON AND REGEX
+# =============================================================
 
-# ---- JSON HANDLING ------------------------------------------
-
-# Load JSON file
+# ── JSON ─────────────────────────────────────────────────────
 with open("logs.json", "r") as f:
     data = json.load(f)
 
-# Access nested fields
-ip = data[0]["metadata"]["ip_address"]
+ip = data[0]["metadata"]["ip_address"]             # nested field access
 
-# Flatten nested JSON to DataFrame
 records = []
 for item in data:
     records.append({
@@ -231,75 +339,49 @@ for item in data:
     })
 df = pd.DataFrame(records)
 
-# ---- REGULAR EXPRESSIONS ------------------------------------
+# ── REGULAR EXPRESSIONS ──────────────────────────────────────
+match = re.search(r"\d+", text)                    # first match
+all_numbers = re.findall(r"\d+", text)             # all matches
 
-import re
-
-# Find first match
-match = re.search(r"\d+", text)
-if match:
-    print(match.group())
-
-# Find all matches
-all_numbers = re.findall(r"\d+", text)
-
-# Find IP addresses
 ip_pattern = r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"
-ips = re.findall(ip_pattern, text)
-
-# Find timestamps
 ts_pattern = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"
-timestamps = re.findall(ts_pattern, text)
-
-# Find user IDs
 user_pattern = r"USR_\d{3}"
-users = re.findall(user_pattern, text)
 
-# Named groups
 pattern = r"(?P<timestamp>\d{4}-\d{2}-\d{2}) (?P<user>USR_\d{3})"
 match = re.search(pattern, log_line)
 if match:
     ts = match.group("timestamp")
     user = match.group("user")
 
-# Replace/redact
-redacted = re.sub(ip_pattern, "[REDACTED IP]", text)
+redacted = re.sub(ip_pattern, "[REDACTED IP]", text)  # replace/redact
 
-# ---- ISOLATION FOREST (ML ANOMALY DETECTION) ----------------
+# =============================================================
+# SECTION 6: MACHINE LEARNING -- ISOLATION FOREST
+# =============================================================
 
-from sklearn.ensemble import IsolationForest
-from sklearn.preprocessing import StandardScaler
-
-# Prepare and normalize features
 features = df[["col1", "col2", "col3"]].copy()
 scaler = StandardScaler()
 scaled = scaler.fit_transform(features)
 
-# Train model -- contamination = expected % of anomalies
+# contamination = expected % of anomalies
 model = IsolationForest(contamination=0.2, random_state=42)
-predictions = model.fit_predict(scaled)  # 1=normal, -1=anomaly
+predictions = model.fit_predict(scaled)            # 1=normal, -1=anomaly
 
-# Get anomaly scores normalized to 0-100
 raw_scores = model.decision_function(scaled)
 anomaly_scores = 100 - (
     (raw_scores - raw_scores.min()) /
     (raw_scores.max() - raw_scores.min()) * 100
 )
 
-# Add to DataFrame
 df["anomaly_flag"] = np.where(predictions == -1, 1, 0)
 df["anomaly_score"] = anomaly_scores.round(1)
 
-# ---- NETWORKX GRAPH ANALYSIS --------------------------------
+# =============================================================
+# SECTION 7: NETWORKX GRAPH ANALYSIS
+# =============================================================
 
-import networkx as nx
-
-# Create graph
 G = nx.Graph()
-
-# Add edges (connections between nodes)
 G.add_edge("USR_001", "USR_003")
-G.add_edge("USR_001", "USR_005")
 
 # Build from shared IP data
 for ip in ip_data["ip_address"].unique():
@@ -308,32 +390,25 @@ for ip in ip_data["ip_address"].unique():
         for j in range(i + 1, len(users)):
             G.add_edge(users[i], users[j])
 
-# Graph statistics
 G.number_of_nodes()
 G.number_of_edges()
 
-# Connected components -- clusters of linked accounts
 components = list(nx.connected_components(G))
-for component in components:
-    print(f"Cluster: {component} ({len(component)} accounts)")
-
-# Flag large clusters
 large_clusters = [c for c in components if len(c) > 2]
-
-# Degree -- how many connections each node has
 degrees = sorted(G.degree(), key=lambda x: x[1], reverse=True)
 
-# Map cluster size back to DataFrame
 component_map = {}
 for component in components:
     for user in component:
         component_map[user] = len(component)
 df["cluster_size"] = df["user_id"].map(component_map).fillna(1)
 
-# ---- CBRN KEYWORD CLASSIFICATION ----------------------------
+# =============================================================
+# SECTION 8: CBRN INVESTIGATION PATTERNS
+# =============================================================
 
+# ── CBRN KEYWORD CLASSIFICATION ──────────────────────────────
 def classify_query(query_text):
-    """Classify query into CBRN threat category."""
     text = query_text.lower()
     if any(w in text for w in ["synthesize", "compound", "stabilize"]):
         return "Chemical"
@@ -350,13 +425,12 @@ df["cbrn_category"] = df["query_text"].apply(classify_query)
 df["is_cbrn"] = df["cbrn_category"] != "Benign"
 cbrn_pct = df["is_cbrn"].mean() * 100
 
-# ---- BEHAVIORAL SCORING SCHEMA v1.0 -------------------------
-
-# Signal 1: Midnight activity ratio (>20% = flag, 20pts)
-# Signal 2: CBRN query percentage (>25% = flag, 30pts)
-# Signal 3: Unknown country queries (any = flag, 20pts)
-# Signal 4: Response length anomaly (>1.5 std = flag, 15pts)
-# Signal 5: Network connectivity (any shared IP = flag, 15pts)
+# ── BEHAVIORAL SCORING SCHEMA v1.0 ───────────────────────────
+# Signal 1: Midnight activity ratio  >20%       flag = 20pts
+# Signal 2: CBRN query percentage    >25%       flag = 30pts
+# Signal 3: Unknown country queries  any        flag = 20pts
+# Signal 4: Response length anomaly  >1.5 std   flag = 15pts
+# Signal 5: Network connectivity     any shared IP flag = 15pts
 
 # Rule-based scoring pattern
 df["rule_score"] = 0
@@ -366,57 +440,21 @@ mask = df["midnight_ratio"] > 0.20
 df.loc[mask, "rule_score"] += 20
 df.loc[mask, "flags"] += "MIDNIGHT_ACTIVITY | "
 
-# Z-score calculation for anomaly threshold
+# Z-score for anomaly threshold
 pop_mean = df["avg_response"].mean()
 pop_std = df["avg_response"].std()
 df["response_zscore"] = ((df["avg_response"] - pop_mean) / pop_std).round(3)
 
-# ---- GIT COMMANDS -------------------------------------------
+# =============================================================
+# SECTION 9: GIT COMMANDS
+# =============================================================
 
-# git init                          -- initialize repository
-# git add .                         -- stage all changes
-# git add filename.py               -- stage specific file
-# git commit -m "message"           -- save snapshot
-# git push                          -- push to GitHub
-# git status                        -- see current state
-# git log --oneline                 -- see commit history
-# git rm --cached file.py           -- untrack a file
-
-# ---- SQL QUICK REFERENCE ------------------------------------
-
-# Basic query structure (Silly Frogs Wear Green Hats Outdoors)
-# SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY
-
-# Window functions
-# ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY timestamp)
-# RANK() OVER (PARTITION BY user_id ORDER BY score DESC)
-# LAG(timestamp) OVER (PARTITION BY user_id ORDER BY timestamp)
-# LEAD(timestamp) OVER (PARTITION BY user_id ORDER BY timestamp)
-# AVG(response_length) OVER (PARTITION BY user_id)
-
-# CTE structure
-# WITH cte_name AS (
-#     SELECT ...
-# )
-# SELECT * FROM cte_name;
-
-# Recursive CTE structure
-# WITH RECURSIVE cte AS (
-#     SELECT ...              -- anchor
-#     UNION ALL
-#     SELECT ... FROM cte     -- recursive step
-#     WHERE depth < 5         -- stopping condition
-# )
-
-# CBRN keyword detection in SQL
-# INSTR(LOWER(query_text), 'synthesize') > 0
-
-# Pivot table pattern
-# SUM(CASE WHEN category = 'Chemical' THEN 1 ELSE 0 END) AS chemical
-
-# Temporal SQL -- time between events
-# ROUND((JULIANDAY(timestamp) - JULIANDAY(prev_timestamp)) * 86400, 0)
-
-# Index for performance
-# CREATE INDEX IF NOT EXISTS idx_country ON table(country);
-# EXPLAIN QUERY PLAN SELECT ...  -- check if index is used
+# git init                    -- initialize repository
+# git add .                   -- stage all changes
+# git add filename.py         -- stage specific file
+# git commit -m "message"     -- save snapshot
+# git push                    -- push to GitHub
+# git pull origin main        -- sync from GitHub
+# git status                  -- see current state
+# git log --oneline           -- see commit history
+# git rm --cached file.py     -- untrack a file
