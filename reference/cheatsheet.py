@@ -127,14 +127,40 @@ import csv
 # ── JOIN PATTERNS ────────────────────────────────────────────
 # INNER JOIN -- only matching rows:
 # SELECT * FROM a JOIN b ON a.id = b.id
-#
+
 # LEFT JOIN -- all rows from left table:
 # SELECT * FROM a LEFT JOIN b ON a.id = b.id
-#
+
 # Self join -- compare rows within same table:
 # SELECT a.user_id, b.user_id
 # FROM table a JOIN table b ON a.ip = b.ip
 # WHERE a.user_id != b.user_id
+
+# Basic JOIN with table aliases (cleaner syntax):
+# SELECT c.col, p.col
+# FROM table1 c JOIN table2 p ON c.id = p.id
+# GROUP BY c.user_id
+# ORDER BY total DESC;
+
+# JOIN with aggregation and filtering:
+# SELECT c.user_id,
+#        COUNT(*) AS total,
+#        SUM(CASE WHEN c.col = 'val' THEN 1 ELSE 0 END) AS count_val,
+#        p.account_age_days
+# FROM logs c
+# JOIN profiles p ON c.user_id = p.user_id
+# WHERE p.account_type = 'free'       -- filter on profile column
+# GROUP BY c.user_id
+# HAVING total > 100                  -- filter on aggregated value
+# AND count_val >= 1                  -- multiple HAVING conditions
+# ORDER BY total DESC;
+#
+# KEY RULES FOR JOINS:
+# -- Use table aliases (c, p) to avoid ambiguous column names
+# -- WHERE filters profile/lookup columns before grouping
+# -- HAVING filters aggregated values after grouping
+# -- Columns from joined table (p.*) don't need aggregating
+# -- COUNT and SUM come from the main log table (c.*)
 
 # ── SUBQUERY PATTERNS ────────────────────────────────────────
 # Filter using subquery result:
