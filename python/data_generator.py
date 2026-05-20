@@ -14,13 +14,16 @@ NUM_ROWS = 50000
 CBRN_KEYWORDS = ['synthesize', 'pathogen', 'fission', 'dispersal', 'compound', 'nuclear', 'precursor', 'transmission']
 BENIGN_KEYWORDS = ['python', 'database', 'algorithm', 'network', 'security', 'testing', 'deployment']
 
-# --- Step 1: Define suspicious user groups ---
+# Randomly select user IDs for suspicious accounts
+all_user_ids = [f'USR_{i:03d}' for i in range(1, NUM_USERS + 1)]
+random.shuffle(all_user_ids)
+
 suspicious_users = {
-    'high_velocity': [f'USR_{i:03d}' for i in range(1, 6)],  # USR_001 to USR_005: 300-800 queries each
-    'cbrn_focused': [f'USR_{i:03d}' for i in range(6, 9)],   # USR_006 to USR_008: >60% CBRN
-    'coordinated_ips': [f'USR_{i:03d}' for i in range(9, 13)],  # USR_009 to USR_012: shared IPs
-    'midnight_users': [f'USR_{i:03d}' for i in range(13, 15)],  # USR_013 to USR_014: >50% midnight
-    'paraphrase_user': ['USR_015'],  # USR_015: near-identical queries
+    'high_velocity': all_user_ids[0:5],
+    'cbrn_focused': all_user_ids[5:8],
+    'coordinated_ips': all_user_ids[8:12],
+    'midnight_users': all_user_ids[12:14],
+    'paraphrase_user': [all_user_ids[14]],
 }
 
 # Flatten to get all suspicious user IDs
