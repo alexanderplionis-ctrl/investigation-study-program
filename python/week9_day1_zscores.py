@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # --- Load data ---
-df = pd.read_csv('data/capstone_logs_clean.csv')
+df = pd.read_csv('data/capstone_logs_enhanced.csv')
 
 # --- Step 1: Compute query count per user ---
 query_counts = df.groupby('user_id').size().reset_index(name='query_count')
